@@ -1,0 +1,245 @@
+sudokusize = 9
+#board = [[0 for i in range(sudokusize)] for j in range(sudokusize)]
+
+#board = [[0,0,7,0,5,0,8,0,0],
+#         [0,0,0,0,0,0,0,0,0],
+#         [0,2,0,4,0,6,0,5,0],
+#         [6,0,5,2,0,3,7,0,4],
+#         [0,9,2,0,8,0,5,6,0],
+#         [7,0,4,1,0,5,3,0,9],
+#         [0,7,0,3,0,2,0,9,0],
+#         [0,0,0,0,0,0,0,0,0],
+#         [0,0,3,0,1,0,6,0,0]]
+
+#hard board
+board = [[0,0,0,0,0,0,0,0,2],
+         [0,0,8,2,0,6,0,5,0],
+         [7,2,5,4,0,0,0,0,0],
+         [0,0,0,0,0,0,4,3,9],
+         [0,0,0,0,6,0,0,0,0],
+         [8,5,2,0,0,0,0,0,0],
+         [0,0,0,0,0,2,8,7,6],
+         [0,3,0,8,0,9,1,0,0],
+         [4,0,0,0,0,0,0,0,0]]
+
+board1 = [[0,0,0,0,8,0,7,0,0],
+          [3,7,0,0,0,5,0,4,0],
+          [0,0,9,0,0,2,0,0,0],
+          [4,5,0,1,0,0,0,3,0],
+          [0,0,0,0,0,0,0,0,0],
+          [0,9,0,0,0,3,0,7,6],
+          [0,0,0,4,0,0,9,0,0],
+          [0,3,0,8,0,0,0,6,2],
+          [0,0,1,0,5,0,0,0,0]]
+
+
+
+
+subBoard = [[[1 for i in range(sudokusize)] for j in range(sudokusize)]for k in range(sudokusize)]
+
+#Function which writes the board to the terminal. Very simple stuff that is not meant for complex GUI
+#Note that any unsolved box will contain the number 0.
+def writeBoard(board):
+    print("  | 1  2  3 | 4  5  6 | 7  8  9")
+    print("-------------------------------")
+    for i in range(1,sudokusize + 1):
+        print(i, "| ", end = "" )
+        for j in range(0, sudokusize):
+            if j % 3 != 0:
+                print(" ", board[i-1][j],  end = "")
+            elif j != 0:
+                print(" |",board[i-1][j], end = "")
+            else:
+                print(board[i-1][j], end = "")
+        print("")
+        if i % 3 == 0:
+            print("-------------------------------")
+    return
+
+#Startup screen which will ask the user several questions about using the software, for this version, there is a board already initialized.
+#In future versions, I plan on adding the functionality of being able to input your own board into the program and it will be able to solve that.
+def startUp():
+    print("Welcome to Sudoku Solver 1.0.0")
+    print("Use the following commands:")
+    print("1. Start new board.")
+    print("2. Quit")
+    command = input()
+    if int(command) == 1:
+        return 1
+    elif int(command) == 2:
+        return 0
+    else:
+        print("Please enter a valid command.")
+        startUp()
+
+#One way to keep track of whether everything is solved is using this function which returns the total number of unsolved, or how many in the board are equal
+#to 0
+def getUnsolved(board):
+    number = 0
+    for i in board:
+        for j in i:
+            if j == 0:
+                number += 1
+    return number
+
+#Function which initializes the "subboard" which is a handy function that we will be using throughout in order to solve the sudoku's the hard way.
+#What the subboard ultimately keeps track of is what numbers are possible in a given box, this will be updated throughout running
+#This is a powerful tool because it will do the bulk of the solving for us.
+def updateSubBoard(board, subBoard):
+    for i in range(len(board)):
+        for j in range(len(board[0])):
+            if board[i][j] == 0:
+                board, subBoard = updateSub(board, subBoard, i, j)
+            else:
+                for k in range(sudokusize):
+                    subBoard[i][j][k] = 0
+    return board, subBoard
+
+#This is checking row, column, and box for all possible numbers each box cannot contain
+def updateSub(board, subBoard, row, col):
+    for i in range(sudokusize):
+        if board[row][i] != 0:
+            subBoard[row][col][board[row][i] - 1] = 0
+        if board[i][col] != 0:
+            subBoard[row][col][board[i][col] - 1] = 0
+        subBoard = updateSubBox(board, subBoard, row, col)
+    return board, subBoard
+
+#Since the box is a bit more tricky since we can't just set the row or column to a constant number, we instead use this in order to update based on box
+def updateSubBox(board, subBoard, row, col):
+    box1 = int(row/3)
+    box2 = int(col/3)
+    for i in range(box1*3, box1*3 + 3):
+        for j in range(box2*3, box2*3 + 3):
+            if board[i][j] != 0:
+                subBoard[row][col][board[i][j]-1] = 0
+    return subBoard
+
+
+#When we solve a box we want to update the subBoard in all row and column so that this number no longer appears
+#Note that a different function will be used for the box, which is a bit trickier since we can't just use row or column to eliminate these.
+def updateSolvedBox(subBoard, row, col, solution):
+    for i in range(sudokusize):
+        subBoard[row][i][solution - 1] = 0
+        subBoard[i][col][solution - 1] = 0
+    return subBoard
+
+#This function checks to see if there is only one solution to the given box, it does this by going through the subBoard in order to find those whose
+#boxes only have one single solution.
+def checkSub(subBoard, row, col):
+    possible = 0
+    index = 0
+    for i in range(sudokusize):
+        if subBoard[row][col][i] == 1:
+            possible += 1
+            index = i
+    if possible == 1:
+        index = index + 1
+    return possible, index
+
+#This function goes through the entire board trying to find those boxes whose solutions can only be one answer.
+def checksubBoard(board, subBoard):
+    for i in range(sudokusize):
+        for j in range(sudokusize):
+            if board[i][j] == 0:
+                subState, solution = checkSub(subBoard, i, j)
+                if subState == 1:
+                    board, subBoard = solveBox(board, subBoard, i, j, solution)
+                    print("Box of row: ", i, " and column: ", j, " had only one solution.")
+                    writeBoard(board)
+    return board, subBoard
+
+
+#This function solves the box by putting the number into the box and updating all subboxes as well.
+def solveBox(board, subBoard, row, col, sol):
+    board[row][col] = sol
+    for i in range(sudokusize):
+        subBoard[row][col][i] = 0
+    subBoard = updateSolvedBox(subBoard, row, col, sol)
+    return board, subBoard
+
+#This function will look through all rows and columns for places where there is only one solution to an open number
+def checkRowsCols(board, subBoard):
+    line = [0 for i in range(sudokusize)]
+    for i in range(sudokusize):
+        for j in range(sudokusize):
+            for k in range(sudokusize):
+                if board[i][j] == 0:
+                    line[k] += subBoard[i][j][k]
+        for l in range(len(line)):
+            if line[l] == 1:
+                line[l] = 0
+                col = getRowSolution(board, subBoard, i, l)
+                board, subBoard = solveBox(board, subBoard, i, col, l+1)
+                print("Row: ", i, " had only one solution for: ", l+1)
+                writeBoard(board)
+                break
+        line = [0 for i in range(sudokusize)]
+    
+    for i in range(sudokusize):
+        for j in range(sudokusize):
+            for k in range(sudokusize):
+                if board[j][i] == 0:
+                    line[k] += subBoard[j][i][k]
+        for l in range(len(line)):
+            if line[l] == 1:
+                line[l] = 0
+                row = getColSolution(board, subBoard, i, l)
+                board, subBoard = solveBox(board, subBoard, row, i, l+1)
+                print("Column: ", i, " had only one solution for: ", l+1)
+                writeBoard(board)
+                break
+        line = [0 for i in range(sudokusize)]
+
+    return board, subBoard
+
+#The above function only finds how many open solutions there are to each number, not where they are, this function returns the location of the
+#number where they are.           
+def getRowSolution(board, subBoard, row, sol):
+    for i in range(len(board)):
+        if board[row][i] == 0 and subBoard[row][i][sol] == 1:
+            return i
+
+#This is the same as the above function, only this time we are looking at the columns instead of row.
+def getColSolution(board, subBoard, col, sol):
+    for i in range(len(board)):
+        if board[i][col] == 0 and subBoard[i][col][sol] == 1:
+            return i
+
+#The main function runs until either the board is solved or if enough attempts have been made that a solution can't be found with current methods.
+#Eventually I will update this with a brute force method but that will be down the line.
+def solveBoard(board):
+    overFlow = 0
+    numberTries = 1000
+    unSolved = getUnsolved(board)
+    newUnsolved = 0
+    gotOne = 1
+    subBoard = [[[1 for i in range(sudokusize)] for j in range(sudokusize)]for k in range(sudokusize)]
+    
+    #I am using this function to go through the entire board until a solution is found. Note that I am using an overflow to ensure that it doesn't run forever because
+    #Right now I haven't fed the program every technique I know to solving sudokus so there are probably many puzzles whose solutions can't yet be found by this program.
+    while unSolved > 0 and overFlow < numberTries:
+        if gotOne:  #updating the subBoard is rather slow, so I don't want to do this unless I have to.
+            board, subBoard = updateSubBoard(board, subBoard)
+        gotOne = 0
+        board, subBoard = checksubBoard(board, subBoard)    #This is where I will be adding the different techniques I know to solve these puzzles, right now, these are the 2
+        board, subBoard = checkRowsCols(board, subBoard)
+        newUnsolved = getUnsolved(board)
+        if newUnsolved != unSolved:
+            unSolved = newUnsolved
+            gotOne = 1
+        overFlow += 1
+    if overFlow == numberTries:
+        print("Sorry, I can't solve this board right now.")
+        print("")
+        return
+    else:
+        return
+
+gameOn = 1    #Game on!
+gameOn = startUp()
+while gameOn:
+    writeBoard(board)
+    solveBoard(board)
+    gameOn = startUp()
+
