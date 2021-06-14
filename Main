@@ -22,6 +22,7 @@ board = [[0,0,0,0,0,0,0,0,2],
          [0,3,0,8,0,9,1,0,0],
          [4,0,0,0,0,0,0,0,0]]
 
+#extreme board
 board1 = [[0,0,0,0,8,0,7,0,0],
           [3,7,0,0,0,5,0,4,0],
           [0,0,9,0,0,2,0,0,0],
@@ -32,13 +33,31 @@ board1 = [[0,0,0,0,8,0,7,0,0],
           [0,3,0,8,0,0,0,6,2],
           [0,0,1,0,5,0,0,0,0]]
 
+board2 = [[0,8,3,1,0,0,5,0,0],
+          [6,0,7,0,8,0,3,0,0],
+          [0,1,4,6,0,0,9,7,8],
+          [0,0,5,0,6,1,0,0,9],
+          [3,6,0,0,2,0,0,5,1],
+          [9,0,0,7,5,0,4,0,0],
+          [7,4,6,0,0,5,2,9,0],
+          [0,0,2,0,7,0,1,0,5],
+          [0,0,9,0,0,3,6,8,0]]
+
+board3 = [[0,3,0,2,0,1,0,0,0],
+          [5,8,0,0,9,6,0,0,0],
+          [0,0,0,0,0,0,3,0,6],
+          [7,6,0,5,0,4,0,0,2],
+          [0,0,4,9,0,3,6,0,0],
+          [9,0,0,6,0,8,0,3,7],
+          [4,0,8,0,0,0,0,0,0],
+          [0,0,0,1,6,0,0,4,9],
+          [0,0,0,4,0,2,0,5,0]]         
 
 
 
 subBoard = [[[1 for i in range(sudokusize)] for j in range(sudokusize)]for k in range(sudokusize)]
 
 #Function which writes the board to the terminal. Very simple stuff that is not meant for complex GUI
-#Note that any unsolved box will contain the number 0.
 def writeBoard(board):
     print("  | 1  2  3 | 4  5  6 | 7  8  9")
     print("-------------------------------")
@@ -57,20 +76,36 @@ def writeBoard(board):
     return
 
 #Startup screen which will ask the user several questions about using the software, for this version, there is a board already initialized.
-#In future versions, I plan on adding the functionality of being able to input your own board into the program and it will be able to solve that.
 def startUp():
     print("Welcome to Sudoku Solver 1.0.0")
     print("Use the following commands:")
     print("1. Start new board.")
-    print("2. Quit")
+    print("2. Enter Custom Board")
+    print("3. Quit")
     command = input()
     if int(command) == 1:
         return 1
     elif int(command) == 2:
+        return 2
+    elif int(command) == 3:
         return 0
     else:
         print("Please enter a valid command.")
         startUp()
+
+#This function allows the user to input a custom board into the solver.
+def inputCustom():
+    board = [[0 for i in range(sudokusize)] for j in range(sudokusize)]
+    for k in range(sudokusize):
+        for l in range(sudokusize):
+            print("Please input number in row: ", k, " and column: ", l)
+            holder = int(input())
+            while holder < 0 or holder > 9:
+                print("Please enter a valid integer number between 0 (unknown solution) and 9")
+                holder = int(input())
+            board[k][l] = holder
+    return board
+
 
 #One way to keep track of whether everything is solved is using this function which returns the total number of unsolved, or how many in the board are equal
 #to 0
@@ -116,15 +151,14 @@ def updateSubBox(board, subBoard, row, col):
     return subBoard
 
 
-#When we solve a box we want to update the subBoard in all row and column so that this number no longer appears
-#Note that a different function will be used for the box, which is a bit trickier since we can't just use row or column to eliminate these.
+#When we solve a box we want to update the subboard in all row and column so that this number no longer appears
 def updateSolvedBox(subBoard, row, col, solution):
     for i in range(sudokusize):
         subBoard[row][i][solution - 1] = 0
         subBoard[i][col][solution - 1] = 0
     return subBoard
 
-#This function checks to see if there is only one solution to the given box, it does this by going through the subBoard in order to find those whose
+#This function checks to see if there is only one solution to the given box, it does this by going through the subboard in order to find those whose
 #boxes only have one single solution.
 def checkSub(subBoard, row, col):
     possible = 0
@@ -199,36 +233,233 @@ def getRowSolution(board, subBoard, row, sol):
     for i in range(len(board)):
         if board[row][i] == 0 and subBoard[row][i][sol] == 1:
             return i
-
-#This is the same as the above function, only this time we are looking at the columns instead of row.
+        
 def getColSolution(board, subBoard, col, sol):
     for i in range(len(board)):
         if board[i][col] == 0 and subBoard[i][col][sol] == 1:
             return i
 
+#This function simply goes through each row, column, and box looking for sets to help make the subBoard smaller.
+def subSetSolver(board, subBoard):
+    solved = False
+    for i in range(sudokusize):
+        subBoard, solved = findExclusiveSetInRow(board, subBoard, i)
+        if solved:
+            solved = False
+            break
+    for j in range(sudokusize):
+        subBoard, solved = findExclusiveSetInCol(board, subBoard, j)
+        if solved: 
+            break
+    for k in range(sudokusize):
+        subBoard, solved = findExclusiveSetInBox(board, subBoard, k)
+        if solved:
+            break
+    return subBoard
+
+#The following three functions are just looking through each row, column, and box trying to find how many sets are possible.
+#There can't be a matching set of 1, since that would already be solved. Likewise, there can't be a set of unsolved - 1, since the last
+#unsolved value would have to go in that spot. So, the set will be from 2 to unsolved - 2, since Python's upper bound on range is not inclusive,
+#the upper bound becomes unsolved - 1.
+def findExclusiveSetInRow(board, subBoard, row):
+    unsolved = rowUnsolved(board, row)
+    solved = False
+    subSet = [0 for i in range(sudokusize)]
+    for i in range(2, unsolved - 1):
+        subBoard, solved = recurseInRow(board, subBoard, row, 0, 0, i, subSet)
+    return subBoard, solved
+
+def findExclusiveSetInCol(board, subBoard, col):
+    unsolved = colUnsolved(board, col)
+    solved = False
+    subSet = [0 for i in range(sudokusize)]
+    for i in range(2, unsolved - 1):
+        subBoard, solved = recurseInCol(board, subBoard, col, 0, 0, i, subSet)
+    return subBoard, solved
+
+def findExclusiveSetInBox(board, subBoard, box):
+    unsolved = boxUnsolved(board, box)
+    solved = False
+    subSet = [0 for i in range(sudokusize)]
+    for i in range(2, unsolved - 1):
+        subBoard, solved = recurseInBox(board, subBoard, box, 0, 0, i, subSet)
+    return subBoard, solved
+
+#We want to check all possible combinations of unknowns, this function will recurse through the unknowns in order to check all possible matching
+#sets given the parameters of how many we want in a set.
+def recurseInRow(board, subBoard, row, starting, current, total, subSet):
+    foundAnswer = False
+    subSetNew = [0 for i in range(sudokusize)]
+    for s in range(sudokusize):
+        subSetNew[s] = subSet[s]
+    for i in range(starting, sudokusize):
+        if board[row][i] == 0:
+            #print("trying to find answers in row: ", row, "col: ", starting)
+            for j in range(sudokusize):
+                if subBoard[row][i][j] == 1:
+                    subSetNew[j] += 1
+            if current + 1 == total:
+                if subSetNum(subSetNew) == total:
+                    foundAnswer = True
+                    subBoard = subBoardSubSet(board, subBoard, row, -1, -1, subSetNew)
+                    return subBoard, True
+            else:
+                subBoard, foundAnswer = recurseInRow(board, subBoard, row, i + 1, current + 1, total, subSetNew)
+            if foundAnswer:
+                return subBoard, True
+            for s in range(sudokusize):
+                subSetNew[s] = subSet[s]
+    return subBoard, False
+
+#We want to check all possible combinations of unknowns, this function will recurse through the unknowns in order to check all possible matching
+#sets given the parameters of how many we want in a set.
+def recurseInCol(board, subBoard, col, starting, current, total, subSet):
+    foundAnswer = False
+    subSetNew = [0 for i in range(sudokusize)]
+    for s in range(sudokusize):
+        subSetNew[s] = subSet[s]
+    for i in range(starting, sudokusize):
+        if board[i][col] == 0:
+            #print("trying to find answers in col: ", col, "row: ", starting)
+            for j in range(sudokusize):
+                if subBoard[i][col][j] == 1:
+                    subSetNew[j] += 1
+            if current + 1 == total:
+                if subSetNum(subSetNew) == total:
+                    foundAnswer = True
+                    subBoard = subBoardSubSet(board, subBoard, -1, col, -1, subSetNew)
+                    return subBoard, True
+            else:
+                subBoard, foundAnswer = recurseInCol(board, subBoard, col, i + 1, current + 1, total, subSetNew)
+            if foundAnswer:
+                return subBoard, True
+            for s in range(sudokusize):
+                subSetNew[s] = subSet[s]
+    return subBoard, False
+
+
+#We want to check all possible combinations of unknowns, this function will recurse through the unknowns in order to check all possible matching
+#sets given the parameters of how many we want in a set.
+def recurseInBox(board, subBoard, box, starting, current, total, subSet):
+    foundAnswer = False
+    subSetNew = [0 for i in range(sudokusize)]
+    for s in range(sudokusize):
+        subSetNew[s] = subSet[s]
+    for i in range(starting, sudokusize):
+        curRow = int(i/3) + 3 * int(box/3)
+        curCol = i % 3 + (3 * (box % 3))
+        if board[curRow][curCol] == 0:
+            for j in range(sudokusize):
+                if subBoard[curRow][curCol][j] == 1:
+                    subSetNew[j] += 1
+            if current + 1 == total:
+                if subSetNum(subSetNew) == total:
+                    foundAnswer = True
+                    subBoard = subBoardSubSet(board, subBoard, -1, -1, box, subSetNew)
+                    return subBoard, True
+            else:
+                subBoard, foundAnswer = recurseInBox(board, subBoard, box, i + 1, current + 1, total, subSetNew)
+            if foundAnswer:
+                return subBoard, True
+            for s in range(sudokusize):
+                subSetNew[s] = subSet[s]
+    return subBoard, False
+
+#Finding how many possible numbers can go in a box, or, a subBoard box.
+def subSetNum(subSet):
+    nums = 0
+    for i in range(sudokusize):
+        if subSet[i] > 0:
+            nums += 1
+    return nums
+
+#Once we know that there is a matching subset so that we can eliminate those numbers from other boxes, we have to figure out where those are since
+#the previous functions can't do that. This is a large function that handles all of rows, columns, and boxes to find those solutions.
+def subBoardSubSet(board, subBoard, row, col, box, subSet):
+    tempSet = [0 for i in range(sudokusize)]
+    if row > -1:
+        for i in range(sudokusize):
+            if board[row][i] == 0:
+                for j in range(sudokusize):
+                    tempSet[j] = max(0, subBoard[row][i][j] - subSet[j])
+                if not isSetEmpty(tempSet):
+                    for k in range(sudokusize):
+                        subBoard[row][i][k] = tempSet[k]
+    elif col > -1:
+        for i in range(sudokusize):
+            if board[i][col] == 0:
+                for j in range(sudokusize):
+                    tempSet[j] = max(0, subBoard[i][col][j] - subSet[j])
+                if not isSetEmpty(tempSet):
+                    for k in range(sudokusize):
+                        subBoard[i][col][k] = tempSet[k]
+    else:
+        startRow = 3 * int(box/3)
+        startCol = (3 * (box % 3))
+        for i in range(startRow, startRow + 3):
+            for j in range(startCol, startCol + 3):
+                if board[i][j] == 0:
+                    for k in range(sudokusize):
+                        tempSet[k] = max(0, subBoard[i][j][k] - subSet[k])
+                    if not isSetEmpty(tempSet):
+                        for k in range(sudokusize):
+                            subBoard[i][j][k] = tempSet[k]
+    return subBoard
+
+#We need to know how many boxes to check for unique subsets and this makes it so that we aren't trying to solve 9 times for a box with 3 unknowns.
+#I have this broken down by rows, boxes, and columns.
+def rowUnsolved(board, row):
+    unsolved = 0
+    for i in board[row]:
+        if i == 0:
+            unsolved += 1
+    return unsolved
+
+def colUnsolved(board, col):
+    unsolved = 0
+    for i in range(sudokusize):
+        if board[i][col] == 0:
+            unsolved += 1
+    return unsolved
+
+def boxUnsolved(board, box):
+    unsolved = 0
+    for i in range(sudokusize):
+        currRow = int(i/3) + 3 * int(box/3)
+        currCol = (i % 3) + (3 * (box % 3))
+        if board[currRow][currCol] == 0:
+            unsolved += 1
+    return unsolved
+
+#This will be used to determine whether the subset is matching and if we can eliminate any other subsets based on this matching.
+def isSetEmpty(subSet):
+    for i in range(sudokusize):
+        if subSet[i] == 1:
+            return False
+    return True
+
 #The main function runs until either the board is solved or if enough attempts have been made that a solution can't be found with current methods.
 #Eventually I will update this with a brute force method but that will be down the line.
 def solveBoard(board):
     overFlow = 0
-    numberTries = 1000
+    numberTries = 100
     unSolved = getUnsolved(board)
     newUnsolved = 0
     gotOne = 1
     subBoard = [[[1 for i in range(sudokusize)] for j in range(sudokusize)]for k in range(sudokusize)]
-    
-    #I am using this function to go through the entire board until a solution is found. Note that I am using an overflow to ensure that it doesn't run forever because
-    #Right now I haven't fed the program every technique I know to solving sudokus so there are probably many puzzles whose solutions can't yet be found by this program.
     while unSolved > 0 and overFlow < numberTries:
-        if gotOne:  #updating the subBoard is rather slow, so I don't want to do this unless I have to.
+        if gotOne:
             board, subBoard = updateSubBoard(board, subBoard)
         gotOne = 0
-        board, subBoard = checksubBoard(board, subBoard)    #This is where I will be adding the different techniques I know to solve these puzzles, right now, these are the 2
+        board, subBoard = checksubBoard(board, subBoard)
         board, subBoard = checkRowsCols(board, subBoard)
+        subBoard = subSetSolver(board, subBoard)
         newUnsolved = getUnsolved(board)
         if newUnsolved != unSolved:
             unSolved = newUnsolved
             gotOne = 1
         overFlow += 1
+        print(overFlow)
     if overFlow == numberTries:
         print("Sorry, I can't solve this board right now.")
         print("")
@@ -236,10 +467,16 @@ def solveBoard(board):
     else:
         return
 
-gameOn = 1    #Game on!
+gameOn = 1
 gameOn = startUp()
 while gameOn:
-    writeBoard(board)
-    solveBoard(board)
+    if gameOn == 2:
+        board = inputCustom()
+        writeBoard(board)
+        solveBoard(board)
+    else:
+        writeBoard(board1)
+        solveBoard(board1)
     gameOn = startUp()
+
 
